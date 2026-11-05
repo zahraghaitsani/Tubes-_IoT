@@ -48,7 +48,7 @@
             grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
             gap: 25px;
             max-width: 1100px;
-            margin: 0 auto;
+            margin: 0 auto 30px auto;
         }
         .card {
             background: var(--card-bg);
@@ -91,7 +91,6 @@
         .gauge-fill { height: 100%; width: 0%; background: var(--success); transition: width 0.4s ease; }
         .control-group { margin-top: 20px; }
         
-        /* Tombol Toggle Tunggal */
         .btn-toggle {
             width: 100%;
             padding: 12px;
@@ -104,8 +103,31 @@
             transition: background-color 0.2s, opacity 0.2s;
         }
         .btn-toggle:hover { opacity: 0.9; }
-        .btn-on-state { background-color: var(--primary); }   /* Biru saat ON */
-        .btn-off-state { background-color: var(--danger); } /* Merah saat OFF */
+        .btn-on-state { background-color: var(--primary); } 
+        .btn-off-state { background-color: var(--danger); }
+
+        /* Styling Tabel History Log */
+        .log-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        }
+        .log-container h3 { margin-top: 0; font-size: 1.15rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 0.9rem;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th { background-color: #f1f5f9; color: #475569; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -135,13 +157,13 @@
                 </div>
             </div>
 
-            <div class="metric-label" style="margin-top: 15px;">Kontrol Sensor PIR (Deteksi Maling):</div>
+            <div class="metric-label" style="margin-top: 15px;">Kontrol Sensor PIR (Deteksi Gerakan):</div>
             <div class="control-group">
                 <button id="btn-r1" class="btn-toggle btn-on-state" onclick="togglePIR('home/ruang1/control', 'btn-r1')">PIR: ON (Aktif)</button>
             </div>
         </div>
 
-        <!-- Node / Ruangan 2 (Skalabilitas Titik Tambahan) -->
+        <!-- Node / Ruangan 2 -->
         <div class="card">
             <h3>Dapur <span class="node-id">ID: RUANG_02</span></h3>
             
@@ -160,21 +182,42 @@
                 </div>
             </div>
 
-            <div class="metric-label" style="margin-top: 15px;">Kontrol Sensor PIR (Deteksi Maling):</div>
+            <div class="metric-label" style="margin-top: 15px;">Kontrol Sensor PIR (Deteksi Gerakan):</div>
             <div class="control-group">
                 <button id="btn-r2" class="btn-toggle btn-on-state" onclick="togglePIR('home/ruang2/control', 'btn-r2')">PIR: ON (Aktif)</button>
             </div>
         </div>
     </div>
 
+    <!-- Tabel Riwayat Log Kondisi Bahaya -->
+    <div class="log-container">
+        <h3>Riwayat Log Insiden & Bahaya (Cloud Firebase)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Waktu</th>
+                    <th>Ruangan</th>
+                    <th>Kejadian / Status</th>
+                    <th>Nilai Gas (MQ-2)</th>
+                </tr>
+            </thead>
+            <tbody id="log-table-body">
+                <tr>
+                    <td colspan="4" style="text-align: center; color: #64748b;">Belum ada insiden bahaya tercatat.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
     <script>
         const client = new Paho.MQTT.Client("broker.emqx.io", 8083, "web_dashboard_" + parseInt(Math.random() * 1000));
 
-        // Menyimpan status state tombol per topik
         const pirStates = {
             'home/ruang1/control': true,
             'home/ruang2/control': true
         };
+
+        let isFirstLog = true;
 
         client.onConnectionLost = function (responseObject) {
             let badge = document.getElementById("conn-badge");
@@ -235,30 +278,60 @@
             }
         }
 
-        // Fungsi Tombol Toggle Tunggal (Biru saat ON, Merah saat OFF)
         function togglePIR(topik, btnId) {
             let btn = document.getElementById(btnId);
-            
-            // Balik status saat ini
             pirStates[topik] = !pirStates[topik];
             let currentState = pirStates[topik];
-
             let pesan = currentState ? "ON" : "OFF";
             
-            // Kirim perintah via MQTT ke ESP32
             let message = new Paho.MQTT.Message(pesan);
             message.destinationName = topik;
             client.send(message);
 
-            // Ubah tampilan warna dan teks tombol secara dinamis
             if (currentState) {
                 btn.innerText = "PIR: ON (Aktif)";
-                btn.className = "btn-toggle btn-on-state"; // Biru
+                btn.className = "btn-toggle btn-on-state";
             } else {
                 btn.innerText = "PIR: OFF (Mati)";
-                btn.className = "btn-toggle btn-off-state"; // Merah
+                btn.className = "btn-toggle btn-off-state";
             }
         }
+
+        // Fungsi opsional untuk menarik data riwayat dari Firebase secara real-time ke web dashboard
+        async function fetchFirebaseLogs() {
+            try {
+                let response = await fetch("https://iot-security-system-b748e-default-rtdb.firebaseio.com/RiwayatInsiden.json");
+                let data = await response.json();
+                
+                let tbody = document.getElementById("log-table-body");
+                tbody.innerHTML = "";
+
+                if (!data) {
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #64748b;">Belum ada insiden bahaya tercatat.</td></tr>`;
+                    return;
+                }
+
+                let keys = Object.keys(data);
+                // Urutkan dari yang terbaru
+                keys.reverse();
+
+                keys.forEach(key => {
+                    let item = data[key];
+                    let row = `<tr>
+                        <td>${item.waktu}</td>
+                        <td><strong>${item.ruangan}</strong></td>
+                        <td><span class="badge danger">${item.kejadian}</span></td>
+                        <td>${item.mq2} / 4095</td>
+                    </tr>`;
+                    tbody.innerHTML += row;
+                });
+            } catch (error) {
+                console.error("Gagal mengambil data Firebase:", error);
+            }
+        }
+
+        // Jalankan sinkronisasi tabel log setiap 5 detik
+        setInterval(fetchFirebaseLogs, 5000);
     </script>
 </body>
 </html>
