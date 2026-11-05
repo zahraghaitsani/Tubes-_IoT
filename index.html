@@ -217,8 +217,6 @@
             'home/ruang2/control': true
         };
 
-        let isFirstLog = true;
-
         client.onConnectionLost = function (responseObject) {
             let badge = document.getElementById("conn-badge");
             badge.innerText = "Terputus dari Cloud";
@@ -229,7 +227,7 @@
             let topic = message.destinationName;
             let data = JSON.parse(message.payloadString);
 
-            // Pastikan ESP32 mengirim data json yang mencakup 'pir', 'mq2', dan 'pir_status'
+            // Menerima data sensor sekaligus status PIR aktif/mati dari ESP32 untuk sinkronisasi multi-user
             if (topic === "home/ruang1/sensor") {
                 updateUI("r1", data.pir, data.mq2, data.pir_status);
             } else if (topic === "home/ruang2/sensor") {
@@ -254,7 +252,6 @@
             }
         });
 
-        // Di dalam fungsi updateUI, tambahkan penanganan status PIR
         function updateUI(roomPrefix, pirVal, mq2Val, pirStatus) {
             let badge = document.getElementById(roomPrefix + "-pir-badge");
             if (pirVal == 1) {
@@ -280,41 +277,35 @@
                 gauge.style.backgroundColor = "var(--success)";
             }
 
-            // --- SINKRONISASI TOMBOL OTOMATIS UNTUK SEMUA USER ---
+            // Sinkronisasi tombol otomatis serentak untuk semua pengguna berdasarkan status asli dari ESP32
             let btnId = (roomPrefix === "r1") ? "btn-r1" : "btn-r2";
             let btn = document.getElementById(btnId);
+            let topicKey = (roomPrefix === "r1") ? 'home/ruang1/control' : 'home/ruang2/control';
             
             if (pirStatus === "ON") {
                 btn.innerText = "PIR: ON (Aktif)";
                 btn.className = "btn-toggle btn-on-state";
-                pirStates[roomPrefix === "r1" ? 'home/ruang1/control' : 'home/ruang2/control'] = true;
+                pirStates[topicKey] = true;
             } else if (pirStatus === "OFF") {
                 btn.innerText = "PIR: OFF (Mati)";
                 btn.className = "btn-toggle btn-off-state";
-                pirStates[roomPrefix === "r1" ? 'home/ruang1/control' : 'home/ruang2/control'] = false;
+                pirStates[topicKey] = false;
             }
         }
 
         function togglePIR(topik, btnId) {
-            let btn = document.getElementById(btnId);
-            pirStates[topik] = !pirStates[topik];
+            // Membalik status state lokal lalu mengirim perintah ke ESP32 via MQTT
             let currentState = pirStates[topik];
-            let pesan = currentState ? "ON" : "OFF";
+            let nextState = !currentState;
+            let pesan = nextState ? "ON" : "OFF";
             
             let message = new Paho.MQTT.Message(pesan);
             message.destinationName = topik;
             client.send(message);
-
-            if (currentState) {
-                btn.innerText = "PIR: ON (Aktif)";
-                btn.className = "btn-toggle btn-on-state";
-            } else {
-                btn.innerText = "PIR: OFF (Mati)";
-                btn.className = "btn-toggle btn-off-state";
-            }
+            // Tampilan tombol akan otomatis diperbarui serentak setelah ESP32 mengeksekusi dan membalas status terbarunya
         }
 
-        // Fungsi opsional untuk menarik data riwayat dari Firebase secara real-time ke web dashboard
+        // Fungsi untuk menarik data riwayat dari Firebase secara real-time ke web dashboard
         async function fetchFirebaseLogs() {
             try {
                 let response = await fetch("https://iot-security-system-b748e-default-rtdb.firebaseio.com/RiwayatInsiden.json");
@@ -329,8 +320,7 @@
                 }
 
                 let keys = Object.keys(data);
-                // Urutkan dari yang terbaru
-                keys.reverse();
+                keys.reverse(); // Urutkan dari yang terbaru
 
                 keys.forEach(key => {
                     let item = data[key];
