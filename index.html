@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Home Security & Gas - Multi Node Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --primary: #3b82f6;
+            --danger: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 30px;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1100px;
+            margin: 0 auto 30px auto;
+        }
+        h2 { font-weight: 700; color: #0f172a; margin: 0; }
+        .connection-status {
+            font-size: 0.85rem;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .connection-status.connected {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 25px;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        .card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            text-align: left;
+            border-top: 5px solid var(--primary);
+        }
+        .card h3 {
+            margin-top: 0;
+            font-size: 1.15rem;
+            font-weight: 600;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .node-id { font-size: 0.8rem; background: #e2e8f0; padding: 2px 8px; border-radius: 6px; color: #475569; }
+        .metric-box { margin: 16px 0; }
+        .metric-label { font-size: 0.85rem; color: #64748b; margin-bottom: 6px; display: flex; justify-content: space-between; }
+        .badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+        .badge.safe { background: #d1fae5; color: #065f46; }
+        .badge.danger { background: #fee2e2; color: #991b1b; }
+        
+        .gauge-container {
+            background: #e2e8f0;
+            border-radius: 10px;
+            overflow: hidden;
+            height: 12px;
+            width: 100%;
+            margin-top: 6px;
+        }
+        .gauge-fill { height: 100%; width: 0%; background: var(--success); transition: width 0.4s ease; }
+        .control-group { margin-top: 20px; }
+        
+        /* Tombol Toggle Tunggal */
+        .btn-toggle {
+            width: 100%;
+            padding: 12px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            transition: background-color 0.2s, opacity 0.2s;
+        }
+        .btn-toggle:hover { opacity: 0.9; }
+        .btn-on-state { background-color: var(--primary); }   /* Biru saat ON */
+        .btn-off-state { background-color: var(--danger); } /* Merah saat OFF */
+    </style>
+</head>
+<body>
+
+    <header>
+        <h2>Smart Home IoT - Multi-Node Monitoring</h2>
+        <div id="conn-badge" class="connection-status">Menghubungkan ke Cloud...</div>
+    </header>
+    
+    <div class="dashboard-grid">
+        <!-- Node / Ruangan 1 -->
+        <div class="card">
+            <h3>Ruang Tamu <span class="node-id">ID: RUANG_01</span></h3>
+            
+            <div class="metric-box">
+                <div class="metric-label"><span>Status Gerakan (PIR)</span></div>
+                <div id="r1-pir-badge" class="badge safe">Menunggu Data...</div>
+            </div>
+
+            <div class="metric-box">
+                <div class="metric-label">
+                    <span>Kadar Gas / Asap (MQ-2)</span>
+                    <span id="r1-mq2-val">0 / 4095</span>
+                </div>
+                <div class="gauge-container">
+                    <div id="r1-gauge" class="gauge-fill"></div>
+                </div>
+            </div>
+
+            <div class="metric-label" style="margin-top: 15px;">Kontrol Sensor PIR (Deteksi Maling):</div>
+            <div class="control-group">
+                <button id="btn-r1" class="btn-toggle btn-on-state" onclick="togglePIR('home/ruang1/control', 'btn-r1')">PIR: ON (Aktif)</button>
+            </div>
+        </div>
+
+        <!-- Node / Ruangan 2 (Skalabilitas Titik Tambahan) -->
+        <div class="card">
+            <h3>Dapur <span class="node-id">ID: RUANG_02</span></h3>
+            
+            <div class="metric-box">
+                <div class="metric-label"><span>Status Gerakan (PIR)</span></div>
+                <div id="r2-pir-badge" class="badge safe">Menunggu Data...</div>
+            </div>
+
+            <div class="metric-box">
+                <div class="metric-label">
+                    <span>Kadar Gas / Asap (MQ-2)</span>
+                    <span id="r2-mq2-val">0 / 4095</span>
+                </div>
+                <div class="gauge-container">
+                    <div id="r2-gauge" class="gauge-fill"></div>
+                </div>
+            </div>
+
+            <div class="metric-label" style="margin-top: 15px;">Kontrol Sensor PIR (Deteksi Maling):</div>
+            <div class="control-group">
+                <button id="btn-r2" class="btn-toggle btn-on-state" onclick="togglePIR('home/ruang2/control', 'btn-r2')">PIR: ON (Aktif)</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const client = new Paho.MQTT.Client("broker.emqx.io", 8083, "web_dashboard_" + parseInt(Math.random() * 1000));
+
+        // Menyimpan status state tombol per topik
+        const pirStates = {
+            'home/ruang1/control': true,
+            'home/ruang2/control': true
+        };
+
+        client.onConnectionLost = function (responseObject) {
+            let badge = document.getElementById("conn-badge");
+            badge.innerText = "Terputus dari Cloud";
+            badge.className = "connection-status";
+        };
+
+        client.onMessageArrived = function (message) {
+            let topic = message.destinationName;
+            let data = JSON.parse(message.payloadString);
+
+            if (topic === "home/ruang1/sensor") {
+                updateUI("r1", data.pir, data.mq2);
+            } else if (topic === "home/ruang2/sensor") {
+                updateUI("r2", data.pir, data.mq2);
+            }
+        };
+
+        client.connect({
+            onSuccess: function () {
+                let badge = document.getElementById("conn-badge");
+                badge.innerText = "Terhubung ke Cloud (MQTT)";
+                badge.className = "connection-status connected";
+                
+                client.subscribe("home/ruang1/sensor");
+                client.subscribe("home/ruang2/sensor");
+            },
+            onFailure: function () {
+                let badge = document.getElementById("conn-badge");
+                badge.innerText = "Gagal Terhubung";
+                badge.className = "connection-status";
+            }
+        });
+
+        function updateUI(roomPrefix, pirVal, mq2Val) {
+            let badge = document.getElementById(roomPrefix + "-pir-badge");
+            if (pirVal == 1) {
+                badge.innerText = "GERAKAN TERDETEKSI";
+                badge.className = "badge danger";
+            } else {
+                badge.innerText = "AMAN";
+                badge.className = "badge safe";
+            }
+
+            document.getElementById(roomPrefix + "-mq2-val").innerText = mq2Val + " / 4095";
+            let percentage = (mq2Val / 4095) * 100;
+            if (percentage > 100) percentage = 100;
+            
+            let gauge = document.getElementById(roomPrefix + "-gauge");
+            gauge.style.width = percentage + "%";
+            
+            if (mq2Val > 1200) {
+                gauge.style.backgroundColor = "var(--danger)";
+            } else if (mq2Val > 800) {
+                gauge.style.backgroundColor = "var(--warning)";
+            } else {
+                gauge.style.backgroundColor = "var(--success)";
+            }
+        }
+
+        // Fungsi Tombol Toggle Tunggal (Biru saat ON, Merah saat OFF)
+        function togglePIR(topik, btnId) {
+            let btn = document.getElementById(btnId);
+            
+            // Balik status saat ini
+            pirStates[topik] = !pirStates[topik];
+            let currentState = pirStates[topik];
+
+            let pesan = currentState ? "ON" : "OFF";
+            
+            // Kirim perintah via MQTT ke ESP32
+            let message = new Paho.MQTT.Message(pesan);
+            message.destinationName = topik;
+            client.send(message);
+
+            // Ubah tampilan warna dan teks tombol secara dinamis
+            if (currentState) {
+                btn.innerText = "PIR: ON (Aktif)";
+                btn.className = "btn-toggle btn-on-state"; // Biru
+            } else {
+                btn.innerText = "PIR: OFF (Mati)";
+                btn.className = "btn-toggle btn-off-state"; // Merah
+            }
+        }
+    </script>
+</body>
+</html>
