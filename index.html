@@ -210,7 +210,7 @@
     </div>
 
     <script>
-        const client = new Paho.MQTT.Client("broker.emqx.io", 8083, "web_dashboard_" + parseInt(Math.random() * 1000));
+        const client = new Paho.MQTT.Client("broker.emqx.io", 8084, "web_dashboard_" + parseInt(Math.random() * 1000));
 
         const pirStates = {
             'home/ruang1/control': true,
@@ -237,6 +237,7 @@
         };
 
         client.connect({
+            useSSL: true,
             onSuccess: function () {
                 let badge = document.getElementById("conn-badge");
                 badge.innerText = "Terhubung ke Cloud (MQTT)";
