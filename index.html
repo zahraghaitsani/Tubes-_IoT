@@ -229,10 +229,11 @@
             let topic = message.destinationName;
             let data = JSON.parse(message.payloadString);
 
+            // Pastikan ESP32 mengirim data json yang mencakup 'pir', 'mq2', dan 'pir_status'
             if (topic === "home/ruang1/sensor") {
-                updateUI("r1", data.pir, data.mq2);
+                updateUI("r1", data.pir, data.mq2, data.pir_status);
             } else if (topic === "home/ruang2/sensor") {
-                updateUI("r2", data.pir, data.mq2);
+                updateUI("r2", data.pir, data.mq2, data.pir_status);
             }
         };
 
@@ -253,7 +254,8 @@
             }
         });
 
-        function updateUI(roomPrefix, pirVal, mq2Val) {
+        // Di dalam fungsi updateUI, tambahkan penanganan status PIR
+        function updateUI(roomPrefix, pirVal, mq2Val, pirStatus) {
             let badge = document.getElementById(roomPrefix + "-pir-badge");
             if (pirVal == 1) {
                 badge.innerText = "GERAKAN TERDETEKSI";
@@ -276,6 +278,20 @@
                 gauge.style.backgroundColor = "var(--warning)";
             } else {
                 gauge.style.backgroundColor = "var(--success)";
+            }
+
+            // --- SINKRONISASI TOMBOL OTOMATIS UNTUK SEMUA USER ---
+            let btnId = (roomPrefix === "r1") ? "btn-r1" : "btn-r2";
+            let btn = document.getElementById(btnId);
+            
+            if (pirStatus === "ON") {
+                btn.innerText = "PIR: ON (Aktif)";
+                btn.className = "btn-toggle btn-on-state";
+                pirStates[roomPrefix === "r1" ? 'home/ruang1/control' : 'home/ruang2/control'] = true;
+            } else if (pirStatus === "OFF") {
+                btn.innerText = "PIR: OFF (Mati)";
+                btn.className = "btn-toggle btn-off-state";
+                pirStates[roomPrefix === "r1" ? 'home/ruang1/control' : 'home/ruang2/control'] = false;
             }
         }
 
