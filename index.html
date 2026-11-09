@@ -309,7 +309,7 @@
         async function fetchFirebaseLogs() {
             try {
                 // Ganti URL fetch dengan server cloud buatan sendiri
-                let response = await fetch("http://IP_KOMPUTER_ANDA:3000/RiwayatInsiden.json");
+                let response = await fetch("https://iot-cloud-d4jf.onrender.com/RiwayatInsiden.json");
                 let data = await response.json();
                 
                 let tbody = document.getElementById("log-table-body");
