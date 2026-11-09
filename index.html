@@ -308,20 +308,21 @@
         // Fungsi untuk menarik data riwayat dari Firebase secara real-time ke web dashboard
         async function fetchFirebaseLogs() {
             try {
-                let response = await fetch("https://iot-security-system-b748e-default-rtdb.firebaseio.com/RiwayatInsiden.json");
+                // Ganti URL fetch dengan server cloud buatan sendiri
+                let response = await fetch("http://IP_KOMPUTER_ANDA:3000/RiwayatInsiden.json");
                 let data = await response.json();
                 
                 let tbody = document.getElementById("log-table-body");
                 tbody.innerHTML = "";
-
-                if (!data) {
+        
+                if (!data || Object.keys(data).length === 0) {
                     tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #64748b;">Belum ada insiden bahaya tercatat.</td></tr>`;
                     return;
                 }
-
+        
                 let keys = Object.keys(data);
                 keys.reverse(); // Urutkan dari yang terbaru
-
+        
                 keys.forEach(key => {
                     let item = data[key];
                     let row = `<tr>
@@ -333,7 +334,7 @@
                     tbody.innerHTML += row;
                 });
             } catch (error) {
-                console.error("Gagal mengambil data Firebase:", error);
+                console.error("Gagal mengambil data dari cloud sendiri:", error);
             }
         }
 
