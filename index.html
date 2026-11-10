@@ -191,7 +191,7 @@
 
     <!-- Tabel Riwayat Log Kondisi Bahaya -->
     <div class="log-container">
-        <h3>Riwayat Log Insiden & Bahaya (Cloud Firebase)</h3>
+        <h3>Riwayat Log Insiden & Bahaya</h3>
         <table>
             <thead>
                 <tr>
@@ -305,7 +305,7 @@
             // Tampilan tombol akan otomatis diperbarui serentak setelah ESP32 mengeksekusi dan membalas status terbarunya
         }
 
-        // Fungsi untuk menarik data riwayat dari Firebase secara real-time ke web dashboard
+        // Fungsi untuk menarik data riwayat dari cloud secara real-time ke web dashboard
         async function fetchFirebaseLogs() {
             try {
                 // Ganti URL fetch dengan server cloud buatan sendiri
