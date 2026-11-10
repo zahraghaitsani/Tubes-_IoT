@@ -306,7 +306,7 @@
         }
 
         // Fungsi untuk menarik data riwayat dari cloud secara real-time ke web dashboard
-        async function fetchFirebaseLogs() {
+        async function fetchCloudLogs() {
             try {
                 // Ganti URL fetch dengan server cloud buatan sendiri
                 let response = await fetch("https://iot-cloud-d4jf.onrender.com/RiwayatInsiden.json");
@@ -339,7 +339,7 @@
         }
 
         // Jalankan sinkronisasi tabel log setiap 5 detik
-        setInterval(fetchFirebaseLogs, 5000);
+        setInterval(fetchCloudLogs, 5000);
     </script>
 </body>
 </html>
